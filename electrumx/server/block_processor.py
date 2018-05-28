@@ -534,6 +534,12 @@ class BlockProcessor(electrumx.server.db.DB):
             # Spend the inputs
             if not tx.is_coinbase:
                 for txin in tx.inputs:
+                    # NOTE(gabriel-samfira): Be forgiving if someone wants
+                    # to rebase and has not implemented is_spendable in their
+                    # custom TxInput
+                    check_spendable = getattr(txin, 'is_spendable', None)
+                    if check_spendable and check_spendable() is False:
+                        continue
                     cache_value = spend_utxo(txin.prev_hash, txin.prev_idx)
                     undo_info_append(cache_value)
                     append_hashX(cache_value[:-12])
@@ -613,6 +619,9 @@ class BlockProcessor(electrumx.server.db.DB):
             # Restore the inputs
             if not tx.is_coinbase:
                 for txin in reversed(tx.inputs):
+                    check_spendable = getattr(txin, 'is_spendable', None)
+                    if check_spendable and check_spendable() is False:
+                        continue
                     n -= undo_entry_len
                     undo_item = undo_info[n:n + undo_entry_len]
                     put_utxo(txin.prev_hash + s_pack('<H', txin.prev_idx),
